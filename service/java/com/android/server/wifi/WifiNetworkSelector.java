@@ -751,7 +751,9 @@ public class WifiNetworkSelector {
                         if (config != null) {
                             mConnectableNetworks.add(Pair.create(scanDetail, config));
                             mNetworkIds.add(config.networkId);
-                            if (config.networkId == lastUserSelectedNetworkId) {
+                            if (lastUserSelectedNetworkId != WifiConfiguration.INVALID_NETWORK_ID
+                                && (config.networkId == lastUserSelectedNetworkId)
+                                || (config.linkedNetworkId == lastUserSelectedNetworkId)) {
                                 wifiCandidates.add(scanDetail, config,
                                         registeredEvaluator.getId(), score, lastSelectionWeight);
                             } else {

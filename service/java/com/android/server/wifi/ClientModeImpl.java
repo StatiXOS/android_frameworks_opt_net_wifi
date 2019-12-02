@@ -768,6 +768,7 @@ public class ClientModeImpl extends StateMachine {
     private final BackupManagerProxy mBackupManagerProxy;
     private final WrongPasswordNotifier mWrongPasswordNotifier;
     private final ConnectionFailureNotifier mConnectionFailureNotifier;
+    private final NetworkConnectionAttemptResultNotifier mNetworkConnectionAttemptResultNotifier;
     private WifiNetworkSuggestionsManager mWifiNetworkSuggestionsManager;
     private boolean mConnectedMacRandomzationSupported;
     // Maximum duration to continue to log Wifi usability stats after a data stall is triggered.
@@ -798,6 +799,8 @@ public class ClientModeImpl extends StateMachine {
         mWifiTrafficPoller = wifiTrafficPoller;
         mLinkProbeManager = linkProbeManager;
 
+        mNetworkConnectionAttemptResultNotifier =
+                new NetworkConnectionAttemptResultNotifier(mContext, mFacade);
         mNetworkInfo = new NetworkInfo(ConnectivityManager.TYPE_WIFI, 0, NETWORKTYPE, "");
         mBatteryStats = IBatteryStats.Stub.asInterface(mFacade.getService(
                 BatteryStats.SERVICE_NAME));
@@ -4040,8 +4043,12 @@ public class ClientModeImpl extends StateMachine {
                         WifiConfiguration targetedNetwork =
                                 mWifiConfigManager.getConfiguredNetwork(mTargetNetworkId);
                         if (targetedNetwork != null) {
-                            mWrongPasswordNotifier.onWrongPasswordError(
+                            if (mWifiConfigManager.isLinkedEphemeralNetwork(mTargetNetworkId)) {
+                                Log.e(TAG, "Connection attempt on unsaved linked network " + targetedNetwork.getPrintableSsid() + " failed");
+                            } else {
+                                mWrongPasswordNotifier.onWrongPasswordError(
                                     targetedNetwork.SSID);
+                            }
                         }
                     } else if (reasonCode == WifiManager.ERROR_AUTH_FAILURE_EAP_FAILURE) {
                         int errorCode = message.arg2;
@@ -4477,6 +4484,10 @@ public class ClientModeImpl extends StateMachine {
                     // network.
                     config = getCurrentWifiConfiguration();
                     if (config != null) {
+                        if (mWifiConfigManager.saveToStoreIfLinkedEphemeralNetwork(config.networkId)) {
+                            Log.i(TAG, "Successfully connected to unsaved linked network " + config.getPrintableSsid());
+                            mNetworkConnectionAttemptResultNotifier.onConnectionAttemptSuccess(config.SSID);
+                        }
                         mWifiInfo.setBSSID(mLastBssid);
                         mWifiInfo.setNetworkId(mLastNetworkId);
                         mWifiInfo.setMacAddress(mWifiNative.getMacAddress(mInterfaceName));
